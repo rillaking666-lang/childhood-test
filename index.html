@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内在回溯：原生家庭特质自测</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8f6f0;
+            --card-bg: #ffffff;
+            --text-main: #4a4a4a;
+            --text-sub: #8c8c8c;
+            --accent: #9fb7a9;
+            --accent-hover: #86a392;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #app {
+            background: var(--card-bg);
+            width: 90%;
+            max-width: 500px;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.03);
+            transition: all 0.5s ease;
+        }
+
+        .screen { display: none; animation: fadeIn 0.8s ease; }
+        .active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h1 { font-size: 1.5rem; font-weight: 400; text-align: center; margin-bottom: 1rem; color: #333; }
+        p { line-height: 1.6; color: var(--text-sub); text-align: center; }
+
+        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
+        
+        button {
+            padding: 16px;
+            border: 1px solid #eee;
+            border-radius: 14px;
+            background: #fff;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+
+        button:hover { background: var(--bg-color); border-color: var(--accent); }
+        button.primary { background: var(--accent); color: white; border: none; }
+        button.primary:hover { background: var(--accent-hover); }
+
+        .progress-bar { height: 4px; background: #eee; border-radius: 2px; margin-bottom: 30px; overflow: hidden; }
+        .progress-inner { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; }
+
+        #result-canvas { margin: 20px 0; max-height: 300px; }
+        .analysis { background: var(--bg-color); padding: 20px; border-radius: 12px; font-size: 0.95rem; line-height: 1.8; text-align: left; }
+        .disclaimer { font-size: 0.75rem; color: #ccc; margin-top: 25px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="screen-welcome" class="screen active">
+        <h1>内在回溯</h1>
+        <p>探索童年经历如何塑造了今天的你。<br>请根据你近期的真实感受回答。</p>
+        <div class="btn-group">
+            <button class="primary" onclick="changeScreen('screen-quiz')">开启探索</button>
+        </div>
+    </div>
+
+    <div id="screen-quiz" class="screen">
+        <div class="progress-bar"><div class="progress-inner" id="bar"></div></div>
+        <h2 id="question-text" style="font-size: 1.2rem; font-weight: 400; text-align: center; height: 60px;">题目加载中...</h2>
+        <div class="btn-group">
+            <button onclick="next(4)">非常符合</button>
+            <button onclick="next(3)">比较符合</button>
+            <button onclick="next(1)">不太符合</button>
+            <button onclick="next(0)">从不如此</button>
+        </div>
+    </div>
+
+    <div id="screen-result" class="screen">
+        <h1>探索结果</h1>
+        <canvas id="result-canvas"></canvas>
+        <div id="result-text" class="analysis"></div>
+        <div class="btn-group">
+            <button onclick="location.reload()">重新测试</button>
+        </div>
+        <p class="disclaimer">测试结果仅供自我参考，不具备临床诊断效力。</p>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { t: "我习惯通过满足他人的需求来获得安全感。", c: "讨好倾向" },
+        { t: "当别人对我表达亲近时，我会下意识想躲开。", c: "回避特质" },
+        { t: "我经常反复确认对方是否还在乎我。", c: "焦虑倾向" },
+        { t: "拒绝别人的要求会让我产生强烈的罪恶感。", c: "边界意识" },
+        { t: "我总觉得只有表现得足够完美，才值得被爱。", c: "自我认同" }
+    ];
+
+    let current = 0;
+    let results = {};
+
+    function changeScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'screen-quiz') showQ();
+    }
+
+    function showQ() {
+        document.getElementById('question-text').innerText = questions[current].t;
+        document.getElementById('bar').style.width = ((current / questions.length) * 100) + '%';
+    }
+
+    function next(score) {
+        results[questions[current].c] = score;
+        current++;
+        if (current < questions.length) {
+            showQ();
+        } else {
+            renderResult();
+        }
+    }
+
+    function renderResult() {
+        changeScreen('screen-result');
+        const ctx = document.getElementById('result-canvas').getContext('2d');
+        
+        // 检查库是否加载
+        if (typeof Chart !== 'undefined') {
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: Object.keys(results),
+                    datasets: [{
+                        data: Object.values(results),
+                        backgroundColor: 'rgba(159, 183, 169, 0.4)',
+                        borderColor: '#9fb7a9',
+                        pointBackgroundColor: '#9fb7a9'
+                    }]
+                },
+                options: { 
+                    scales: { r: { min: 0, max: 4, ticks: { display: false } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // 结果分析逻辑
+        let maxLabel = Object.keys(results).reduce((a, b) => results[a] > results[b] ? a : b);
+        const tips = {
+            "讨好倾向": "你很擅长体察他人，但请记得，你的感受同样重要。试着每天为自己做一个不迎合他人的小决定。",
+            "回避特质": "独立是你的保护色。试着在安全的环境下，向信任的人分享一点点内心的脆弱。",
+            "焦虑倾向": "你对关系的变动很敏感。尝试通过正念练习，告诉自己：‘此时此刻，我是安全的’。",
+            "边界意识": "学会划清界限并不是推开别人，而是保护自己的能量。‘不’是一个完整的句子。",
+            "自我认同": "你的存在本身就有价值，不需要通过不断的优秀和完美来证明。对自己温柔一点。"
+        };
+        document.getElementById('result-text').innerHTML = `<strong>核心洞察：</strong><br>${tips[maxLabel]}`;
+    }
+</script>
+</body>
+</html>
